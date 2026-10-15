@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ترصد ثان المحلة</title><meta name="theme-color" content="#0f766e">
+<style>
+:root{--bg:#f4f7f6;--card:#fff;--tx:#17302b;--mu:#6a7f7a;--pr:#0f766e;--bd:#d6e2df;--ok:#dcfce7;--bad:#fee2e2;--wn:#fef9c3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1a18;--card:#172623;--tx:#e6f1ee;--mu:#93a9a4;--pr:#2dd4bf;--bd:#2a3f3b;--ok:#14532d;--bad:#7f1d1d;--wn:#713f12}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Tahoma,Arial,sans-serif;font-size:16px}
+header{background:var(--pr);color:#fff;padding:14px;text-align:center;font-weight:bold;font-size:19px}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) header{color:#042f2a}}
+nav{display:flex;gap:6px;padding:10px}nav button{flex:1;padding:10px 4px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;font-size:14px}
+nav button.on{background:var(--pr);color:#fff;border-color:var(--pr)}
+main{padding:0 10px 30px;max-width:900px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;margin:10px 0 4px;color:var(--mu);font-size:14px}
+select,input,textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+.go{width:100%;margin-top:14px;padding:14px;border:0;border-radius:10px;background:var(--pr);color:#fff;font:inherit;font-weight:bold}
+.msg{margin-top:10px;padding:10px;border-radius:10px;background:var(--ok);display:none}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{border:1px solid var(--bd);padding:7px;text-align:center}th{background:var(--bg)}
+.s{display:flex;gap:8px;margin-bottom:12px}.s div{flex:1;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;text-align:center}.s b{display:block;font-size:22px;color:var(--pr)}
+small{color:var(--mu)}
+</style></head><body>
+<header>ترصد ثان المحلة</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<script>
+const R={o:["غياب","تأمين مريض","لا توجد حالات","أخرى"],m:["لم يتم التبليغ من المسؤول","لا توجد حالات","عطل في السيستم","أخرى"]};
+const RN={o:"مسؤول ترصد",m:"مراقب صحي"};
+let UNITS=[],tab="a",mode="d",adminDate=today(),issued=null,staff=false;
+function today(){const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
+function addDays(s,n){const d=new Date(s+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+const $=id=>document.getElementById(id);
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);v===null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(p,body,method){
+ const r=await fetch("/api"+p,{method:method||(body?"POST":"GET"),headers:{"Content-Type":"application/json",Authorization:"Bearer "+(ls("t")||"")},body:body?JSON.stringify(body):undefined});
+ const j=await r.json().catch(()=>({}));
+ if(r.status==401&&ls("t")&&p!="/login"&&p!="/admin/login"){logout();throw new Error(j.error)}
+ if(!r.ok)throw new Error(j.error||"خطأ");return j}
+function logout(){ls("t",null);ls("k",null);ls("u",null);render()}
+function nav(){const k=ls("k");let h="";
+ if(k=="admin")h=[["a","التقارير"],["u","المستخدمون"]].map(t=>`<button class="${tab==t[0]?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")+`<button style="flex:0 0 70px" onclick="logout()">خروج</button>`;
+ else if(k=="user"){const m=JSON.parse(ls("u"));h=`<div style="flex:1;padding:8px">👤 ${esc(m.name)} — ${RN[m.role]}</div><button style="flex:0 0 80px" onclick="logout()">خروج</button>`}
+ $("nav").innerHTML=h}
+function loginView(){return `<div class="card"><div style="display:flex;gap:6px;margin-bottom:6px"><button class="go" style="margin:0;opacity:${staff?.5:1}" onclick="staff=false;render()">دخول موظف</button><button class="go" style="margin:0;opacity:${staff?1:.5}" onclick="staff=true;render()">دخول الإدارة</button></div>
+ ${staff?`<label>كلمة السر</label><input id="pw" type="password">`:`<label>رقم التليفون</label><input id="ph" inputmode="tel" placeholder="01xxxxxxxxx"><label>الكود (وصلك على واتساب)</label><input id="cd" inputmode="numeric" placeholder="------">`}
+ <button class="go" onclick="doLogin()">دخول</button><div class="msg" id="ms" style="background:var(--bad)"></div></div>`}
+async function doLogin(){const m=$("ms");m.style.display="none";
+ try{const j=staff?await api("/admin/login",{password:$("pw").value}):await api("/login",{phone:$("ph").value,code:$("cd").value});
+  ls("t",j.token);ls("k",staff?"admin":"user");if(!staff)ls("u",JSON.stringify(j.user));render()}
+ catch(e){m.textContent=e.message;m.style.display="block"}}
+function form(me){const role=me.role;
+ const t=role=="o"?"عدد الحالات التي بلّغتها للمراقب":"عدد الحالات التي أدخلتها على السيستم";
+ return `<div class="card"><label>الوحدة</label><select id="u">${me.units.map(u=>`<option>${esc(u)}</option>`).join("")}</select>
+ <label>التاريخ</label><input type="date" id="d" value="${today()}">
+ <label>${t}</label><input type="number" id="n" min="0" inputmode="numeric" placeholder="0" oninput="chk()">
+ <div id="rb" style="display:none"><label>السبب</label><select id="r">${R[role].map(x=>`<option>${x}</option>`).join("")}</select>
+ <textarea id="x" rows="2" placeholder="ملاحظة (اختياري)" style="margin-top:8px"></textarea></div>
+ <button class="go" onclick="save()">حفظ</button><div class="msg" id="ms"></div></div>`}
+function chk(){const n=$("n").value;$("rb").style.display=(n!==""&&+n===0)?"block":"none"}
+async function save(){const n=$("n").value,m=$("ms");if(n===""||+n<0){alert("اكتب العدد (اكتب 0 إذا لم يوجد)");return}
+ try{await api("/report",{unit:$("u").value,date:$("d").value,count:+n,reason:$("r")?.value,note:$("x")?.value});m.textContent="✅ تم الحفظ — "+$("u").value;m.style.background="var(--ok)"}
+ catch(e){m.textContent="⚠️ "+e.message;m.style.background="var(--bad)"}m.style.display="block"}
+async function usersView(){const us=await api("/admin/users");
+ const rows=us.map(u=>`<tr><td>${esc(u.name)}<br><small>${u.phone}</small></td><td>${RN[u.role]}</td><td><small>${u.units.map(esc).join("، ")}</small></td>
+ <td><button onclick="newCode('${u.phone}')">كود جديد</button> <button onclick="delU('${u.phone}')">حذف</button></td></tr>`).join("");
+ return `<div class="card"><b>إضافة مستخدم</b><label>الاسم</label><input id="nm"><label>رقم التليفون (واتساب)</label><input id="np" inputmode="tel" placeholder="01xxxxxxxxx">
+ <label>الوظيفة</label><select id="nr"><option value="o">مسؤول ترصد</option><option value="m">مراقب صحي</option></select>
+ <label>الوحدات</label><div style="columns:2;font-size:14px">${UNITS.map((u,i)=>`<label style="margin:2px 0;color:var(--tx)"><input type="checkbox" class="uc" value="${i}" style="width:auto"> ${u}</label>`).join("")}</div>
+ <button class="go" onclick="addU()">إنشاء الكود</button></div>
+ ${issued?`<div class="card" style="background:var(--ok)">كود <b>${esc(issued.name)}</b>: <b style="font-size:24px">${issued.code}</b><br><small>يظهر مرة واحدة فقط</small><br><a class="go" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" target="_blank" href="https://wa.me/${issued.phone}?text=${encodeURIComponent(`مرحبًا ${issued.name}\nكود دخولك لتطبيق ترصد ثان المحلة: ${issued.code}\nرقم الدخول: ${issued.phone}\nالرابط: ${location.origin}`)}">إرسال على واتساب</a></div>`:""}
+ <div class="card tw"><table><tr><th>المستخدم</th><th>الوظيفة</th><th>الوحدات</th><th></th></tr>${rows||'<tr><td colspan=4>لا يوجد مستخدمون</td></tr>'}</table></div>`}
+async function addU(){const units=[...document.querySelectorAll(".uc:checked")].map(c=>UNITS[+c.value]);
+ try{issued=await api("/admin/users",{name:$("nm").value,phone:$("np").value,role:$("nr").value,units});render()}catch(e){alert(e.message)}}
+async function newCode(p){try{issued=await api("/admin/users/"+p+"/code",{});render()}catch(e){alert(e.message)}}
+async function delU(p){if(confirm("حذف المستخدم؟")){await api("/admin/users/"+p,null,"DELETE");render()}}
+async function admin(){
+ const days=[...Array(7)].map((_,k)=>addDays(adminDate,k-6)),data={};
+ (await api(`/admin/reports?from=${days[0]}&to=${days[6]}`)).forEach(r=>data[r.date+"_"+r.role+"_"+r.unit]=r);
+ const get=(d,role,u)=>data[d+"_"+role+"_"+u];
+ let h=`<div class="card"><div style="display:flex;gap:6px"><button class="go" style="margin:0;opacity:${mode=="d"?1:.5}" onclick="mode='d';render()">تقرير يومي</button><button class="go" style="margin:0;opacity:${mode=="w"?1:.5}" onclick="mode='w';render()">تقرير أسبوعي</button></div>
+ <label>${mode=="d"?"اليوم":"آخر يوم في الأسبوع (7 أيام تنتهي به)"}</label><input type="date" value="${adminDate}" onchange="adminDate=this.value;render()"></div>`;
+ if(mode=="d"){let to=0,tm=0,no=0,nm=0;
+  const rows=UNITS.map(u=>{const o=get(adminDate,"o",u),m=get(adminDate,"m",u);
+   if(o)to+=o.count;else no++;if(m)tm+=m.count;else nm++;
+   const c=x=>x?(x.count>0?`<b>${x.count}</b>`:`0<br><small>${esc(x.reason)}${x.note?": "+esc(x.note):""}</small>`)+`<br><small>${esc(x.by_name)}</small>`:"—";
+   const bad=o&&m&&o.count!=m.count,miss=!o||!m;
+   return `<tr style="background:${bad?"var(--bad)":miss?"var(--wn)":"transparent"}"><td>${u}</td><td>${c(o)}</td><td>${c(m)}</td></tr>`}).join("");
+  h+=`<div class="s"><div><b>${to}</b>بلّغ المسؤولون</div><div><b>${tm}</b>أدخل المراقبون</div><div><b>${no}/${nm}</b>لم يسجّل (مسؤول/مراقب)</div></div>
+  <div class="card tw"><table><tr><th>الوحدة</th><th>مسؤول الترصد</th><th>المراقب الصحي</th></tr>${rows}</table><small>🟥 اختلاف بين العددين &nbsp; 🟨 لم يسجّل أحدهما</small></div>`}
+ else{const rows=UNITS.map(u=>{let so=0,sm=0,co=0,cm=0;
+   days.forEach(d=>{const o=get(d,"o",u),m=get(d,"m",u);if(o){so+=o.count;co++}if(m){sm+=m.count;cm++}});
+   return `<tr><td>${u}</td><td>${so}</td><td>${co}/7</td><td>${sm}</td><td>${cm}/7</td><td style="background:${so!=sm?"var(--bad)":"transparent"}">${so-sm}</td></tr>`}).join("");
+  h+=`<div class="card tw"><small>من ${days[0]} إلى ${days[6]}</small><table><tr><th>الوحدة</th><th>بلّغ المسؤول</th><th>أيام</th><th>أدخل المراقب</th><th>أيام</th><th>الفرق</th></tr>${rows}</table></div>`}
+ return h}
+async function render(){nav();const a=$("app"),k=ls("k");
+ if(!ls("t")){a.innerHTML=loginView();return}
+ try{if(k=="user"){a.innerHTML=form(JSON.parse(ls("u")));chk()}
+  else a.innerHTML=tab=="u"?await usersView():await admin()}
+ catch(e){if(ls("t"))a.innerHTML=`<div class="card">⚠️ ${esc(e.message)}</div>`}}
+fetch("/api/meta").then(r=>r.json()).then(j=>{UNITS=j.units;render()});
+</script></body></html>
