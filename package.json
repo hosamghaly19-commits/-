@@ -1,1 +1,1 @@
-{"name":"tarasod-thani-mahalla","version":"1.0.0","private":true,"main":"server.js","engines":{"node":">=18"},"scripts":{"start":"node server.js"},"dependencies":{"express":"^4.22.3","mysql2":"^3.24.6"}}
+{"name":"tarasod-thani-mahalla","version":"1.0.0","private":true,"main":"server.js","engines":{"node":">=18"},"scripts":{"start":"node server.js"},"dependencies":{"express":"^4.22.3","pg":"^8.23.1"}}
